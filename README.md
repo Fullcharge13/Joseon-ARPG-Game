@@ -1,4 +1,4 @@
-# 조선퇴마록 외전: 백귀사 (v0.1)
+# 조선퇴마록 외전: 백귀사 (v0.2)
 
 > 이 파일은 `node tools/readme_gen.js` 가 게임 데이터에서 만듭니다. 표를 손으로 고치지 말고 `src/js/02_data.js` 를 고친 뒤 다시 만드세요.
 
@@ -6,6 +6,11 @@
 
 - 웹 브라우저 하나로 PC와 휴대폰(가로 화면)에서 플레이합니다. 파일은 `dist/index.html` 한 장입니다.
 - 외부 라이브러리·이미지 파일 없이, 그림은 모두 코드로 그리고 소리는 Web Audio로 합성합니다.
+
+## 휴대폰에서 하기
+- 주소: **https://fullcharge13.github.io/Joseon-ARPG-Game/** (`main`에 올라가면 자동으로 새 판이 올라갑니다)
+- 홈 화면 앱: 휴대폰 브라우저 메뉴에서 「홈 화면에 추가」를 누르면 앱처럼 전체 화면으로 열립니다. 한 번 열어 둔 뒤에는 인터넷이 끊겨도 실행됩니다.
+- 기록: 퇴마청 「기록」 창에 층마다 걸린 시간·쓰러짐·받은 피해가 최근 30층까지 남습니다. 「기록 복사」로 요약 글을 복사할 수 있습니다.
 
 ## 조작
 | | PC | 휴대폰 |
@@ -83,7 +88,7 @@
 
 ## 만들기와 시험
 ```
-python3 build.py                      # src/ → dist/index.html
+python3 build.py                      # src/ → dist/(index.html, 앱 정보 파일, 오프라인 저장, 아이콘)
 bash tests/run_all.sh                 # 단위 시험 + 자동 플레이 12판 + 브라우저 화면 순회
 node tests/sim/play.js 12 3           # 자동 플레이만(판 수, 보스 처치 목표)
 node tools/readme_gen.js              # 이 README 다시 만들기

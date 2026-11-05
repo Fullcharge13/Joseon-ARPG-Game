@@ -1,7 +1,8 @@
 /* ======================= 게임 데이터 ======================= */
-const GAME_VER = 'v0.1';
+const GAME_VER = 'v0.2';
 const SAVE_KEY = 'baekgwisa-save';
-const SAVE_VER = 1;
+const SAVE_VER = 2; // v0.2: 플레이 기록(stats) 추가
+const STATS_MAX = 30;
 const MAX_LVL = 30;
 const BAG_MAX = 30;
 const TILE = 16;

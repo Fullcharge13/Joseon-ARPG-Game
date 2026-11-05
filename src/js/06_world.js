@@ -228,6 +228,7 @@ function hurtPlayer(w, amt, src, type) {
     if (p.shield.amt <= 0.0001) breakShield(w);
   }
   if (type === 'fire') p.burn = 2;
+  amt = Math.min(amt, p.hp); // 남은 체력보다 많이 세지 않는다(기록용)
   p.hp -= amt;
   w.rs.taken += amt;
   w.rs.takenBy[src] = (w.rs.takenBy[src] || 0) + amt;

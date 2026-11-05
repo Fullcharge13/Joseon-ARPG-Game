@@ -8,7 +8,15 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'tests' / 'browser' / 'out'
 OUT.mkdir(parents=True, exist_ok=True)
-URL = (ROOT / 'dist' / 'index.html').as_uri()
+# 로컬 웹 서버로 연다(파일로 열면 홈 화면 앱의 오프라인 저장이 꺼지므로)
+import http.server, threading, functools, socketserver
+class _Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+_H = functools.partial(_Quiet, directory=str(ROOT / 'dist'))
+_SRV = socketserver.ThreadingTCPServer(('127.0.0.1', 0), _H)
+threading.Thread(target=_SRV.serve_forever, daemon=True).start()
+URL = f'http://127.0.0.1:{_SRV.server_address[1]}/'
+
 DEVICES = [
     ('pc', dict(viewport={'width': 1280, 'height': 720})),
     ('phone', dict(viewport={'width': 844, 'height': 390}, device_scale_factor=3, is_mobile=True, has_touch=True)),
@@ -51,7 +59,7 @@ def touch_hold(pg, x, y, ms, pid=7):
 
 def run(dev, opts, p):
     b = p.chromium.launch()
-    ctx = b.new_context(**opts)
+    ctx = b.new_context(**opts, permissions=['clipboard-read', 'clipboard-write'])
     pg = ctx.new_page()
     errs = []
     pg.on('console', lambda m: m.type == 'error' and errs.append(m.text))
@@ -59,6 +67,14 @@ def run(dev, opts, p):
     pg.goto(URL)
     pg.wait_for_timeout(400)
     shot(pg, dev, '01_title')
+    app = pg.evaluate("""async () => {
+      const m = await (await fetch(document.querySelector('link[rel=manifest]').href)).json();
+      const icons = await Promise.all(m.icons.map(i => fetch(i.src).then(r => r.ok && r.headers.get('content-type').includes('png'))));
+      const reg = await Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise(r => setTimeout(() => r(false), 6000))]);
+      return {name: m.short_name, orient: m.orientation, icons, reg};
+    }""")
+    if app['name'] != '백귀사' or app['orient'] != 'landscape' or not all(app['icons']): fails.append(f'{dev}: 앱 정보 파일·아이콘 이상 {app}')
+    if not app['reg']: fails.append(f'{dev}: 오프라인 저장(서비스 워커) 등록 안 됨')
     click(pg, '#b-new')
     pg.wait_for_timeout(300)
     shot(pg, dev, '02_town')
@@ -177,6 +193,26 @@ def run(dev, opts, p):
     shot(pg, dev, '14_dead')
     if '쓰러졌다' not in pg.inner_text('#s-msg'): fails.append(f'{dev}: 쓰러짐 창 없음')
     click(pg, '#s-msg [data-a=b0]')
+    # v0.2 기록 창과 기록 복사
+    pg.wait_for_timeout(300)
+    n_rec = pg.evaluate('GS.ch.stats.length')
+    if n_rec < 3: fails.append(f'{dev}: 층 기록이 적음 {n_rec}')
+    ends = pg.evaluate("GS.ch.stats.map(r => r.end).join(',')")
+    if 'won' not in ends or 'dead' not in ends: fails.append(f'{dev}: 보스 처치·쓰러짐 기록 없음 {ends}')
+    click(pg, '[data-a=stats]')
+    pg.wait_for_timeout(200)
+    shot(pg, dev, '15_stats')
+    click(pg, '#s-stats [data-a=copy]')
+    pg.wait_for_timeout(400)
+    clip = pg.evaluate('navigator.clipboard.readText()')
+    if '백귀사 플레이 기록' not in clip or '쓰러짐' not in clip: fails.append(f'{dev}: 기록 복사 내용 이상 {clip[:80]}')
+    click(pg, '#s-stats .ft [data-a=close]')
+    # 인터넷이 끊겨도 열리나(오프라인 저장본)
+    pg.wait_for_timeout(500)
+    ctx.set_offline(True)
+    pg.reload(); pg.wait_for_timeout(600)
+    if pg.evaluate("document.getElementById('verTag').textContent") != pg.evaluate('GAME_VER'): fails.append(f'{dev}: 인터넷을 끊으면 안 열림')
+    ctx.set_offline(False)
     # 다시 불러오기: 저장이 남았나
     pg.reload(); pg.wait_for_timeout(400)
     if 'Lv' not in pg.inner_text('#b-cont'): fails.append(f'{dev}: 저장이 안 남음')
@@ -202,6 +238,13 @@ def run(dev, opts, p):
     med = ft[len(ft) // 2] if ft else 0
     p95 = ft[int(len(ft) * 0.95)] if ft else 0
     perf = {'median_ms': round(med, 1), 'p95_ms': round(p95, 1), 'throttle': 1 if dev == 'pc' else 4, 'lowFx': pg.evaluate('R_.lowFx')}
+    # 검토: 층 중간에 앱을 닫았다 다시 켜면 그 층이 「중단」으로 남는다
+    if dev != 'pc': cdp.send('Emulation.setCPUThrottlingRate', {'rate': 1})
+    n0 = pg.evaluate('GS.ch.stats.length')
+    pg.evaluate("() => dispatchEvent(new Event('pagehide'))")
+    pg.reload(); pg.wait_for_timeout(500)
+    click(pg, '#b-cont'); pg.wait_for_timeout(300)
+    if pg.evaluate('GS.ch.stats.length') != n0 + 1 or pg.evaluate('GS.ch.stats[GS.ch.stats.length-1].end') != 'quit': fails.append(f'{dev}: 앱을 닫은 층이 「중단」으로 남지 않음')
     if errs: fails.append(f'{dev}: 콘솔 오류 {errs[:5]}')
     b.close()
     return perf
@@ -214,4 +257,4 @@ print('프레임 시간:', json.dumps(perf, ensure_ascii=False))
 print('캡처:', OUT)
 if fails:
     print('실패', len(fails)); [print(' -', f) for f in fails]; sys.exit(1)
-print('화면 순회 통과 (기기 %d종)' % len(DEVICES))
+print('화면 순회 통과 (기기 %d종, %s)' % (len(DEVICES), URL))

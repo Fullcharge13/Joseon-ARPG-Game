@@ -65,7 +65,7 @@ function rerollAffix(rng, it, idx) {
 /* --- 캐릭터 --- */
 function newChar() {
   const w = {uid: ITEM_SEQ++, slot: 'weapon', il: 1, rar: 0, base: BASES.weapon[0], affixes: [], rr: 0, power: 6};
-  return {lvl: 1, xp: 0, gold: 0, skills: {meok: {rank: 1, br: 0}}, slots: ['meok', null, null, null], equip: {weapon: w}, bag: [], tier: 1, maxTier: 1};
+  return {lvl: 1, xp: 0, gold: 0, skills: {meok: {rank: 1, br: 0}}, slots: ['meok', null, null, null], equip: {weapon: w}, bag: [], tier: 1, maxTier: 1, stats: []};
 }
 function calcStats(ch) {
   const B = BASE_STATS;

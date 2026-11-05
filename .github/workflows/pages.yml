@@ -1,0 +1,38 @@
+# main 에 올라가면: 빌드 결과가 소스와 같은지·단위 시험을 확인한 뒤 dist/ 를 GitHub Pages 로 배포한다.
+name: 웹 배포
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false # 배포 도중 다음 배포가 와도 앞의 것을 끊지 않는다
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 빌드 결과가 소스와 같은지
+        run: python3 build.py --check
+      - name: 단위 시험
+        run: node --test tests/unit/*.test.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -74,6 +74,7 @@ function startNew() {
 
 /* --- 마을: 퇴마청 --- */
 function goTown() {
+  if (GS.mode === 'dungeon') recordFloor('home'); // 멈춤 → 마을로(이미 기록한 층이면 건너뜀)
   GS.mode = 'town';
   GS.w = null;
   GS.modal = null;
@@ -100,6 +101,7 @@ function goTown() {
     <button data-a="bag">가방 ${ch.bag.length}/${BAG_MAX}</button>
     <button data-a="skill">수련${freePoints(ch) > 0 ? ` <b style="color:#ffd451">+${freePoints(ch)}</b>` : ''}</button>
     <button data-a="forge">대장간</button>
+    <button data-a="stats">기록${ch.stats && ch.stats.length ? ' ' + ch.stats.length : ''}</button>
     <button data-a="title">처음 화면</button>
    </div></div></div></div>`;
   showScr('s-town');
@@ -110,6 +112,7 @@ function goTown() {
     bag: () => openBag('town'),
     skill: () => openSkill('town'),
     forge: openForge,
+    stats: openStats,
     title: showTitle
   });
 }
@@ -434,4 +437,39 @@ function closeModalToGame() {
   GS.modal = null;
   guardInput(0.25);
   showScr('none');
+}
+
+/* --- 기록(v0.2): 사람이 해 본 층 시간·쓰러짐·받은 피해를 저에게 붙여 줄 수 있게 --- */
+function openStats() {
+  GS.modal = 'stats';
+  GS.back = 'town';
+  guardInput();
+  const ch = GS.ch,
+    el = $('s-stats'),
+    S = (ch.stats || []).slice().reverse();
+  const rows = S.map(r => `<tr><td>${r.at.slice(5, 10)}</td><td>업${r.tier} ${r.floor}층</td><td>${r.sec}초</td><td class="${r.end === 'dead' ? 'bad' : r.end === 'won' ? 'good' : ''}">${STAT_END[r.end]}</td><td>Lv${r.lvl}</td><td>${r.kills}</td><td>${r.taken}</td><td>${r.by.length ? esc(srcName(r.by[0][0])) : '-'}</td></tr>`).join('');
+  el.innerHTML = `<div class="box"><div class="hd"><h2>기록</h2><span class="pill">최근 ${S.length}/${STATS_MAX}층</span><button class="x" data-a="close">✕</button></div>
+   <div class="bd"><p class="note">층마다 걸린 시간·쓰러짐·받은 피해가 남습니다. 「기록 복사」를 눌러 대화창에 붙여 주시면 수치를 사람 기준으로 맞춥니다.</p>
+   ${S.length ? `<div class="tbl"><table><thead><tr><th>날짜</th><th>층</th><th>시간</th><th>결과</th><th>레벨</th><th>처치</th><th>받은 피해</th><th>가장 아팠던 것</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="note">아직 기록이 없습니다.</p>'}
+   <textarea id="statsTxt" readonly hidden>${esc(statsText(ch))}</textarea></div>
+   <div class="ft"><button class="pri" data-a="copy" ${S.length ? '' : 'disabled'}>기록 복사</button><button data-a="close">닫기</button></div></div>`;
+  showScr('s-stats');
+  wire(el, {
+    close: closeModal,
+    copy: () => {
+      const txt = statsText(ch),
+        ta = $('statsTxt');
+      const manual = () => {
+        ta.hidden = false;
+        ta.focus();
+        ta.select();
+        toast('글 상자를 길게 눌러 복사하세요');
+      };
+      try {
+        navigator.clipboard.writeText(txt).then(() => toast('<b>기록을 복사했습니다.</b> 대화창에 붙여 주세요'), manual);
+      } catch (e) {
+        manual();
+      }
+    }
+  });
 }
